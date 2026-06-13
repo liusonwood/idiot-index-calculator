@@ -21,6 +21,63 @@ body {
     font-size: 1.3rem;
 }
 
+/* ===== Intro Section ===== */
+.intro-card {
+    background: linear-gradient(135deg, #f0f4ff 0%, #fafbff 100%);
+    border-left: 4px solid #0d6efd;
+}
+
+.intro-title {
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 0.8rem;
+}
+
+.intro-icon {
+    margin-right: 0.3rem;
+}
+
+.intro-text {
+    color: #495057;
+    line-height: 1.8;
+    margin-bottom: 0.8rem;
+}
+
+.formula-box {
+    background-color: #ffffff;
+    border: 1px dashed #0d6efd;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    margin: 1rem 0;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+.formula-label {
+    color: #0d6efd;
+    font-weight: 600;
+}
+
+.formula-expr {
+    color: #1a1a2e;
+    font-weight: 500;
+}
+
+.intro-list {
+    padding-left: 1.2rem;
+    color: #495057;
+    line-height: 1.9;
+}
+
+.intro-list li {
+    margin-bottom: 0.3rem;
+}
+
+.intro-divider {
+    margin: 1.2rem 0;
+    border-top: 1px solid #dee2e6;
+}
+
 /* ===== Cards ===== */
 .card {
     border: none;

@@ -93,13 +93,15 @@ function validateUserInput(input) {
 /**
  * Extracts product information from Markdown content
  * @param {string} markdown - The Markdown content
- * @returns {Object} - { sellingPrice, totalCost, idiotIndex }
+ * @returns {Object} - { retailPrice, bomCost, rawMaterialValue, consumerIndex, manufacturingIndex, productName }
  */
 function extractProductInfo(markdown) {
     const result = {
-        sellingPrice: null,
-        totalCost: null,
-        idiotIndex: null,
+        retailPrice: null,
+        bomCost: null,
+        rawMaterialValue: null,
+        consumerIndex: null,
+        manufacturingIndex: null,
         productName: null
     };
 
@@ -109,74 +111,121 @@ function extractProductInfo(markdown) {
         result.productName = nameMatch[1].trim();
     }
 
-    // Extract selling price
-    const priceMatch = markdown.match(/\*\*售价\*\*[：:]\s*([0-9,\.]+)/i);
-    if (priceMatch) {
-        result.sellingPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
+    // Extract retail price
+    const retailMatch = markdown.match(/\*\*官方零售价\*\*[：:]\s*[\$￥]?([0-9,\.]+)/i);
+    if (retailMatch) {
+        result.retailPrice = parseFloat(retailMatch[1].replace(/,/g, ''));
     }
 
-    // Extract total cost from table
-    const totalCostMatch = markdown.match(/\*\*总计\*\*.*?\*\*([0-9,\.]+)\*\*/is);
-    if (totalCostMatch) {
-        result.totalCost = parseFloat(totalCostMatch[1].replace(/,/g, ''));
+    // Extract BOM cost
+    const bomMatch = markdown.match(/\*\*硬件物料成本.*?\*\*[：:]\s*[\$￥]?([0-9,\.]+)/i);
+    if (bomMatch) {
+        result.bomCost = parseFloat(bomMatch[1].replace(/,/g, ''));
     }
 
-    // Extract idiot index
-    const indexMatch = markdown.match(/白痴指数\s*=.*?=\s*([0-9\.]+)/i);
-    if (indexMatch) {
-        result.idiotIndex = parseFloat(indexMatch[1]);
+    // Extract raw material value from table
+    const rawValueMatch = markdown.match(/\*\*合计\*\*.*?\*\*约\s*[\$￥]?([0-9,\.]+)\*\*/is);
+    if (rawValueMatch) {
+        result.rawMaterialValue = parseFloat(rawValueMatch[1].replace(/,/g, ''));
+    }
+
+    // Extract consumer idiot index
+    const consumerIndexMatch = markdown.match(/消费者白痴指数.*?=.*?=.*?([0-9\.]+)/is);
+    if (consumerIndexMatch) {
+        result.consumerIndex = parseFloat(consumerIndexMatch[1]);
+    }
+
+    // Extract manufacturing idiot index
+    const mfgIndexMatch = markdown.match(/制造白痴指数.*?=.*?=.*?([0-9\.]+)/is);
+    if (mfgIndexMatch) {
+        result.manufacturingIndex = parseFloat(mfgIndexMatch[1]);
     }
 
     return result;
 }
 
 /**
- * Verifies the calculation accuracy
- * @param {Object} productInfo - { sellingPrice, totalCost, idiotIndex }
- * @returns {Object} - { valid: boolean, expectedIndex: number, tolerance: number }
+ * Verifies the calculation accuracy for both Consumer and Manufacturing indices
+ * @param {Object} productInfo - { retailPrice, bomCost, rawMaterialValue, consumerIndex, manufacturingIndex }
+ * @returns {Object} - Verification results for both indices
  */
 function verifyCalculation(productInfo) {
-    const { sellingPrice, totalCost, idiotIndex } = productInfo;
+    const { retailPrice, bomCost, rawMaterialValue, consumerIndex, manufacturingIndex } = productInfo;
+
+    const warnings = [];
 
     // Check if all values are present
-    if (sellingPrice === null || totalCost === null || idiotIndex === null) {
+    if (rawMaterialValue === null) {
         return {
             valid: false,
-            error: '无法提取完整数据进行验证',
-            expectedIndex: null
+            error: '无法提取原材料价值数据进行验证',
+            consumerVerification: null,
+            manufacturingVerification: null
         };
     }
 
     // Check for division by zero
-    if (totalCost === 0) {
+    if (rawMaterialValue === 0) {
         return {
             valid: false,
-            error: '总成本为零，计算无效',
-            expectedIndex: null
+            error: '原材料价值为零，计算无效',
+            consumerVerification: null,
+            manufacturingVerification: null
         };
     }
 
-    // Calculate expected index
-    const expectedIndex = sellingPrice / totalCost;
+    // Verify Consumer Idiot Index
+    let consumerVerification = null;
+    if (retailPrice !== null && consumerIndex !== null) {
+        const expectedConsumerIndex = retailPrice / rawMaterialValue;
+        const tolerance = Math.max(0.5, expectedConsumerIndex * 0.05);
+        const diff = Math.abs(expectedConsumerIndex - consumerIndex);
+        const valid = diff <= tolerance;
 
-    // Calculate tolerance (5% or 0.1, whichever is larger)
-    const tolerance = Math.max(0.1, expectedIndex * 0.05);
+        consumerVerification = {
+            valid,
+            expectedIndex: expectedConsumerIndex.toFixed(1),
+            statedIndex: consumerIndex.toFixed(1),
+            difference: diff.toFixed(1),
+            tolerance: tolerance.toFixed(1)
+        };
 
-    // Check if within tolerance
-    const diff = Math.abs(expectedIndex - idiotIndex);
-    const valid = diff <= tolerance;
+        if (!valid) {
+            warnings.push('消费者白痴指数计算可能有误');
+        }
+    }
+
+    // Verify Manufacturing Idiot Index
+    let manufacturingVerification = null;
+    if (bomCost !== null && manufacturingIndex !== null) {
+        const expectedMfgIndex = bomCost / rawMaterialValue;
+        const tolerance = Math.max(0.5, expectedMfgIndex * 0.05);
+        const diff = Math.abs(expectedMfgIndex - manufacturingIndex);
+        const valid = diff <= tolerance;
+
+        manufacturingVerification = {
+            valid,
+            expectedIndex: expectedMfgIndex.toFixed(1),
+            statedIndex: manufacturingIndex.toFixed(1),
+            difference: diff.toFixed(1),
+            tolerance: tolerance.toFixed(1)
+        };
+
+        if (!valid) {
+            warnings.push('制造白痴指数计算可能有误');
+        }
+    }
 
     return {
-        valid,
-        expectedIndex: expectedIndex.toFixed(2),
-        statedIndex: idiotIndex.toFixed(2),
-        difference: diff.toFixed(2),
-        tolerance: tolerance.toFixed(2)
+        valid: warnings.length === 0,
+        warnings,
+        consumerVerification,
+        manufacturingVerification
     };
 }
 
 /**
- * Generates a warning message for calculation discrepancies
+ * Generates warning messages for calculation discrepancies
  * @param {Object} verification - Result from verifyCalculation
  * @returns {string} - Warning message in Markdown
  */
@@ -185,17 +234,31 @@ function generateCalculationWarning(verification) {
         return '';
     }
 
-    if (!verification.expectedIndex) {
+    if (!verification.consumerVerification && !verification.manufacturingVerification) {
         return `> ⚠️ **验证提示**：${verification.error}`;
     }
 
-    return `> ⚠️ **计算验证警告**
->
-> 预期白痴指数：**${verification.expectedIndex}**
-> 显示白痴指数：**${verification.statedIndex}**
-> 差异：**${verification.difference}**（容差：${verification.tolerance}）
->
-> 请核实计算过程。`;
+    let warningText = '> ⚠️ **计算验证警告**\n>\n';
+
+    // Consumer Index Warning
+    if (verification.consumerVerification && !verification.consumerVerification.valid) {
+        warningText += `> **消费者白痴指数**：\n`;
+        warningText += `> - 预期值：**${verification.consumerVerification.expectedIndex}**\n`;
+        warningText += `> - 显示值：**${verification.consumerVerification.statedIndex}**\n`;
+        warningText += `> - 差异：${verification.consumerVerification.difference}（容差：${verification.consumerVerification.tolerance}）\n>\n`;
+    }
+
+    // Manufacturing Index Warning
+    if (verification.manufacturingVerification && !verification.manufacturingVerification.valid) {
+        warningText += `> **制造白痴指数**：\n`;
+        warningText += `> - 预期值：**${verification.manufacturingVerification.expectedIndex}**\n`;
+        warningText += `> - 显示值：**${verification.manufacturingVerification.statedIndex}**\n`;
+        warningText += `> - 差异：${verification.manufacturingVerification.difference}（容差：${verification.manufacturingVerification.tolerance}）\n>\n`;
+    }
+
+    warningText += '> 请核实计算过程。';
+
+    return warningText;
 }
 
 // ===== Output Validation =====
@@ -275,8 +338,15 @@ function truncateText(text, maxLength = 100) {
 function extractSummary(markdown) {
     const info = extractProductInfo(markdown);
 
-    if (info.productName && info.idiotIndex) {
-        return `${info.productName} - 白痴指数: ${info.idiotIndex}`;
+    if (info.productName && info.consumerIndex) {
+        let summary = `${info.productName}`;
+        if (info.consumerIndex) {
+            summary += ` - 消费者指数: ${info.consumerIndex}`;
+        }
+        if (info.manufacturingIndex) {
+            summary += ` | 制造指数: ${info.manufacturingIndex}`;
+        }
+        return summary;
     }
 
     if (info.productName) {

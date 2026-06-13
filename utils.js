@@ -81,10 +81,6 @@ function validateUserInput(input) {
         return { valid: false, error: '请输入产品描述' };
     }
 
-    if (input.trim().length < 3) {
-        return { valid: false, error: '产品描述太短，请提供更多信息' };
-    }
-
     return { valid: true, error: null };
 }
 

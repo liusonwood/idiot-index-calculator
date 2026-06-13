@@ -185,6 +185,7 @@ async function handleStart() {
     isCalculating = true;
     showLoading(true);
     hideResults();
+    showChatSection(false); // Hide chat section when starting new calculation
 
     // Prepare messages
     conversationHistory = [
@@ -388,8 +389,16 @@ function renderResults(markdown) {
     resultsCard.style.display = 'block';
     resultsCard.classList.add('show');
 
-    // Scroll to results
-    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Auto-scroll to bottom of content during streaming
+    // Calculate scroll position to show the latest content
+    const windowHeight = window.innerHeight;
+    const cardRect = resultsCard.getBoundingClientRect();
+    const cardBottom = cardRect.bottom;
+
+    // If the bottom of the card is below the viewport, scroll to it
+    if (cardBottom > windowHeight) {
+        resultsCard.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
 }
 
 /**

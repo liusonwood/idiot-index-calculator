@@ -8,6 +8,29 @@
  */
 
 /**
+ * Creates Standard OpenRouter request headers
+ */
+function openRouterHeaders(apiKey) {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`,
+    'HTTP-Referer': window.location?.origin || 'http://localhost',
+    'X-Title': 'Idiot Index Calculator'
+  };
+}
+
+/**
+ * Resolves the API endpoint URL from base URL
+ */
+function resolveEndpoint(apiUrl) {
+  const base = apiUrl.trim();
+  if (!base) return '';
+  const url = new URL(base);
+  const pathname = url.pathname.replace(/\/$/, '');
+  return pathname ? `${url.origin}${pathname}/chat/completions` : url.origin + '/chat/completions';
+}
+
+/**
  * Sends a message to the OpenRouter API with streaming support
  * @param {Object} config - API configuration
  * @param {string} config.apiKey - OpenRouter API key
@@ -23,59 +46,45 @@ async function sendMessage(config, messages, onChunk, onComplete, onError) {
     const { apiKey, apiUrl, apiModel } = config;
 
     // Validate configuration
-    const validation = validateSettings(config);
-    if (!validation.valid) {
-        onError(validation.error);
-        return Promise.reject(new Error(validation.error));
-    }
+  const validation = validateSettings(config);
+  if (!validation.valid) {
+    onError(validation.error);
+    throw new Error(validation.error);
+  }
 
-    // Prepare API endpoint
-    const endpoint = apiUrl.endsWith('/')
-        ? `${apiUrl}chat/completions`
-        : `${apiUrl}/chat/completions`;
+  const endpoint = resolveEndpoint(apiUrl);
+  const requestBody = {
+    model: apiModel,
+    messages,
+    stream: true
+  };
+  const headers = openRouterHeaders(apiKey);
 
-    // Prepare request body
-    const requestBody = {
-        model: apiModel,
-        messages: messages,
-        stream: true
-    };
-
-    // Prepare headers
-    const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': window.location.origin || 'http://localhost',
-        'X-Title': 'Idiot Index Calculator'
-    };
-
-    try {
-        // Make the API request
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(requestBody)
-        });
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(requestBody)
+  });
 
         // Handle HTTP errors
-        if (!response.ok) {
-            const errorText = await response.text();
-            let errorMessage = `API 请求失败 (${response.status})`;
+if (!response.ok) {
+  const errorText = await response.text();
+  let errorMessage = `API 请求失败 (${response.status})`;
 
-            try {
-                const errorJson = JSON.parse(errorText);
-                if (errorJson.error && errorJson.error.message) {
-                    errorMessage = errorJson.error.message;
-                }
-            } catch (e) {
-                errorMessage += `: ${errorText}`;
-            }
+  try {
+    const errorJson = JSON.parse(errorText);
+    if (errorJson.error && errorJson.error.message) {
+      errorMessage = errorJson.error.message;
+    }
+  } catch (e) {
+    errorMessage += `: ${errorText}`;
+  }
 
-            onError(errorMessage);
-            return Promise.reject(new Error(errorMessage));
-        }
+  onError(errorMessage);
+  throw new Error(errorMessage);
+}
 
-        // Handle streaming response
+// Handle streaming response
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullResponse = '';
@@ -159,22 +168,49 @@ async function sendMessage(config, messages, onChunk, onComplete, onError) {
  * @returns {Promise<string>} - Promise that resolves with the response
  */
 async function sendMessageNonStreaming(config, messages) {
-    const { apiKey, apiUrl, apiModel } = config;
+  const { apiKey, apiUrl, apiModel } = config;
 
-    const validation = validateSettings(config);
-    if (!validation.valid) {
-        return Promise.reject(new Error(validation.error));
-    }
+  const validation = validateSettings(config);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
 
-    const endpoint = apiUrl.endsWith('/')
-        ? `${apiUrl}chat/completions`
-        : `${apiUrl}/chat/completions`;
+  const endpoint = resolveEndpoint(apiUrl);
+  const requestBody = {
+    model: apiModel,
+    messages,
+    stream: false
+  };
+  const headers = openRouterHeaders(apiKey);
 
-    const requestBody = {
-        model: apiModel,
-        messages: messages,
-        stream: false
-    };
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(requestBody)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const message = `API 请求失败: ${errorText}`;
+    throw new Error(message);
+  }
+
+  const data = await response.json();
+  if (data.choices && data.choices[0] && data.choices[0].message) {
+    return data.choices[0].message.content;
+  }
+  throw new Error('API 响应格式错误');
+}
+
+  const endpoint = resolveEndpoint(apiUrl);
+
+  const requestBody = {
+    model: apiModel,
+    messages,
+    stream: true
+  };
+
+  const headers = openRouterHeaders(apiKey);
 
     const headers = {
         'Content-Type': 'application/json',

@@ -135,21 +135,29 @@ async function handleStart() {
     const userInput = document.getElementById('productInput').value.trim();
     const inputValidation = validateUserInput(userInput);
 
-    if (!inputValidation.valid) {
-        showToast(inputValidation.error, 'error');
-        return;
-    }
+  if (!inputValidation.valid) {
+    showToast(inputValidation.error, 'error');
+    return;
+  }
+
+  const settings = readAllSettings();
+  const settingsValidation = validateSettings(settings);
+  if (!settingsValidation.valid) {
+    showToast('请先配置 API 设置：' + settingsValidation.error, 'error');
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+    modal.show();
+    return;
+  }
 
     // Get settings
-    const settings = getSettings();
-    const settingsValidation = validateSettings(settings);
-
-    if (!settingsValidation.valid) {
-        showToast('请先配置 API 设置：' + settingsValidation.error, 'error');
-        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
-        modal.show();
-        return;
-    }
+  const settings = readAllSettings();
+  const settingsValidation = validateSettings(settings);
+  if (!settingsValidation.valid) {
+    showToast('请先配置 API 设置：' + settingsValidation.error, 'error');
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+    modal.show();
+    return;
+  }
 
     // Start calculation
     isCalculating = true;
@@ -234,14 +242,14 @@ async function handleChat() {
         return;
     }
 
-    // Get settings
-    const settings = getSettings();
-    const settingsValidation = validateSettings(settings);
-
-    if (!settingsValidation.valid) {
-        showToast('API 设置无效', 'error');
-        return;
-    }
+  const settings = readAllSettings();
+  const settingsValidation = validateSettings(settings);
+  if (!settingsValidation.valid) {
+    showToast('请先配置 API 设置：' + settingsValidation.error, 'error');
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+    modal.show();
+    return;
+  }
 
     // Start processing
     isCalculating = true;

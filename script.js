@@ -5,122 +5,92 @@
  */
 
 // ===== Global State =====
-let conversationHistory = []; // Stores the conversation for chat continuation
-let currentMarkdownContent = ''; // Stores the current analysis result
-let isCalculating = false; // Prevents duplicate requests
+let conversationHistory = [];
+let currentMarkdownContent = '';
+let isCalculating = false;
+
+const DEFAULT_SETTINGS = {
+  apiKey: '',
+  apiUrl: 'https://openrouter.ai/api/v1',
+  apiModel: 'anthropic/claude-3.5-sonnet'
+};
+
+const LS_KEYS = {
+  apiKey: 'openrouter_api_key',
+  apiUrl: 'openrouter_api_url',
+  apiModel: 'openrouter_model'
+};
 
 // ===== Initialization =====
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+document.addEventListener('DOMContentLoaded', () => {
+  restoreSettings();
+  initTooltips();
+  setupEventListeners();
+  configureMarkdown();
 });
 
-function initializeApp() {
-    // Load saved settings
-    loadSettings();
-
-    // Initialize Bootstrap tooltips
-    initTooltips();
-
-    // Set up event listeners
-    setupEventListeners();
-
-    // Configure Marked.js
-    configureMarkdown();
-
-    console.log('白痴指数计算器已初始化');
-}
-
 // ===== Settings Management =====
-
-/**
- * Loads settings from localStorage
- */
-function loadSettings() {
-    const settings = {
-        apiKey: localStorage.getItem('openrouter_api_key') || '',
-        apiUrl: localStorage.getItem('openrouter_api_url') || 'https://openrouter.ai/api/v1',
-        apiModel: localStorage.getItem('openrouter_model') || 'anthropic/claude-3.5-sonnet'
-    };
-
-    // Populate settings form
-    document.getElementById('apiKey').value = settings.apiKey;
-    document.getElementById('apiUrl').value = settings.apiUrl;
-    document.getElementById('apiModel').value = settings.apiModel;
+function readSetting(key, fallback) {
+  return localStorage.getItem(key) ?? fallback;
 }
 
-/**
- * Saves settings to localStorage
- */
+function writeSettings(settings) {
+  localStorage.setItem(LS_KEYS.apiKey, settings.apiKey);
+  localStorage.setItem(LS_KEYS.apiUrl, settings.apiUrl);
+  localStorage.setItem(LS_KEYS.apiModel, settings.apiModel);
+}
+
+function readAllSettings() {
+  return {
+    apiKey: readSetting(LS_KEYS.apiKey, DEFAULT_SETTINGS.apiKey),
+    apiUrl: readSetting(LS_KEYS.apiUrl, DEFAULT_SETTINGS.apiUrl),
+    apiModel: readSetting(LS_KEYS.apiModel, DEFAULT_SETTINGS.apiModel)
+  };
+}
+
+function restoreSettings() {
+  const settings = readAllSettings();
+  document.getElementById('apiKey').value = settings.apiKey;
+  document.getElementById('apiUrl').value = settings.apiUrl;
+  document.getElementById('apiModel').value = settings.apiModel;
+}
+
+function collectSettingsFromForm() {
+  return {
+    apiKey: document.getElementById('apiKey').value.trim(),
+    apiUrl: document.getElementById('apiUrl').value.trim(),
+    apiModel: document.getElementById('apiModel').value.trim()
+  };
+}
+
 function saveSettings() {
-    const settings = {
-        apiKey: document.getElementById('apiKey').value.trim(),
-        apiUrl: document.getElementById('apiUrl').value.trim(),
-        apiModel: document.getElementById('apiModel').value.trim()
-    };
-
-    // Validate settings
-    const validation = validateSettings(settings);
-    if (!validation.valid) {
-        alert('设置错误：' + validation.error);
-        return;
-    }
-
-    // Save to localStorage
-    localStorage.setItem('openrouter_api_key', settings.apiKey);
-    localStorage.setItem('openrouter_api_url', settings.apiUrl);
-    localStorage.setItem('openrouter_model', settings.apiModel);
-
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
-    modal.hide();
-
-    // Show success message
-    showToast('设置已保存', 'success');
-}
-
-/**
- * Gets current settings from localStorage
- * @returns {Object} - Settings object
- */
-function getSettings() {
-    return {
-        apiKey: localStorage.getItem('openrouter_api_key') || '',
-        apiUrl: localStorage.getItem('openrouter_api_url') || 'https://openrouter.ai/api/v1',
-        apiModel: localStorage.getItem('openrouter_model') || 'anthropic/claude-3.5-sonnet'
-    };
+  const settings = collectSettingsFromForm();
+  const validation = validateSettings(settings);
+  if (!validation.valid) {
+    alert('设置错误：' + validation.error);
+    return;
+  }
+  writeSettings(settings);
+  bootstrap.Modal.getInstance(document.getElementById('settingsModal'))?.hide();
+  showToast('设置已保存', 'success');
 }
 
 // ===== Event Listeners =====
-
-/**
- * Sets up all event listeners
- */
 function setupEventListeners() {
-    // Settings button
-    document.getElementById('settingsBtn').addEventListener('click', function() {
-        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
-        modal.show();
-    });
-
-    // Save settings button
-    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
-
-    // Export button
-    document.getElementById('exportBtn').addEventListener('click', handleExport);
-
-    // Start button
-    document.getElementById('startBtn').addEventListener('click', handleStart);
-
-    // Send chat button
-    document.getElementById('sendChatBtn').addEventListener('click', handleChat);
-
-    // Enter key handlers
-    document.getElementById('chatInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleChat();
-        }
-    });
+  document.getElementById('settingsBtn').addEventListener('click', () => {
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+    modal.show();
+  });
+  document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+  document.getElementById('exportBtn').addEventListener('click', handleExport);
+  document.getElementById('startBtn').addEventListener('click', handleStart);
+  document.getElementById('sendChatBtn').addEventListener('click', handleChat);
+  document.getElementById('chatInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChat();
+    }
+  });
 }
 
 /**
